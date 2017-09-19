@@ -1,38 +1,31 @@
 package main
 import(
-"fmt"
-"flag"
-"github.com/streadway/amqp"
-"os"
-"io/ioutil"
+		"fmt"
+		"flag"
+		"github.com/streadway/amqp"
+		"os"
+		"io/ioutil"
 )
+
 func main() {
+
 	// Read a source file and place it on a rabbit topic exchange
 	var url, exchange, routing_key,    encryption_key,    signing_key, name, password string
 	var port, host , queue, vhost, message_path_and_file string
 	var msg_body []byte
 	var err error
+
 	getArguments(&name, &password, &port, &host, &url, &queue, &exchange, &routing_key, &encryption_key, &signing_key, &vhost, &message_path_and_file)
-	// Connect to Rabbit
-	ch, conn := rabbitConnect(url)
-	defer conn.Close()
-	defer ch.Close()
-	// REMOVE THIS CODE !!!  Do not Declare in prod - must exist Prior to run ?
-	rabbitPrepare(ch, exchange, queue, routing_key)
-	// END OF CODE TO REMOVE
+
 	msg_body = getBody(message_path_and_file)
+
 	// If encyrpt specified then encrypt
 	// if sign specified then sign
-	err = sendToRabbit(ch, exchange, routing_key, msg_body)
-	failOnError(err, "Failed to publish a message")
+
+	sendToRabbit(url, exchange, queue, routing_key, err, msg_body)
+	
 }
-func rabbitConnect(url string) ( *amqp.Channel, *amqp.Connection) {
-	conn, err := amqp.Dial(url)
-	failOnError(err, "Failed to connect to RabbitMQ")
-	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	return ch, conn
-}
+
 func getArguments(name *string,
 	password *string,
 	port *string,
@@ -73,6 +66,7 @@ func getArguments(name *string,
 		fmt.Println("Url use overrides specific parameters") //A specific URL is set , so use it
 	}
 }
+
 func getFromEnvIfEmpty(target *string, key string, defaultValue string)  {
 	if *target == "" {
 		if value, present := os.LookupEnv(key); present {
@@ -82,6 +76,7 @@ func getFromEnvIfEmpty(target *string, key string, defaultValue string)  {
 		}
 	}
 }
+
 // Consider adding StdIn reading here to support piping ?
 func getBody(file_path string)([]byte){
 	var msg_body []byte
@@ -92,6 +87,45 @@ func getBody(file_path string)([]byte){
 	} else {panic("No file name supplied")}  // Only mandatory until we support piping
 	return msg_body
 }
+
+func failOnError(err error, msg string) {
+	if err != nil {
+		panic(fmt.Sprintf("%s: %s", msg, err))
+	}
+}
+
+func sendToRabbit(url string, exchange string, queue string, routing_key string, err error, msg_body []byte) {
+	// Connect to Rabbit
+	conn, err := amqp.Dial(url)
+	failOnError(err, "Failed to connect to RabbitMQ")
+	ch, err := conn.Channel()
+	failOnError(err, "Failed to open a channel")
+
+	defer conn.Close()
+	defer ch.Close()
+
+
+	// REMOVE THIS CODE !!!  Do not Declare in prod - must exist Prior to run ?
+	rabbitPrepare(ch, exchange, queue, routing_key)
+	// END OF CODE TO REMOVE
+
+
+	err = ch.Publish(
+		exchange,    // exchange
+		routing_key, // routing key
+		false,       // mandatory
+		false,       // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body: msg_body,
+		})
+
+	failOnError(err, "Failed to publish a message")
+}
+
+
+
+
 // Not for Prod
 func rabbitPrepare(ch *amqp.Channel, exchange string, queue string, routing_key string)  {
 	err := ch.ExchangeDeclare(
@@ -122,26 +156,13 @@ func rabbitPrepare(ch *amqp.Channel, exchange string, queue string, routing_key 
 		nil)
 	failOnError(err, fmt.Sprintf("could not bind queue %s to exchange %s", queue, exchange))
 }
+
 func Use(vals ...interface{}) {
 	for _, val := range vals {
 		_ = val
 	}
 }
 // End of Not for Prod
-func sendToRabbit(ch *amqp.Channel, exchange string, routing_key string, body []byte) (error) {
-	err := ch.Publish(
-		exchange,    // exchange
-		routing_key, // routing key
-		false,       // mandatory
-		false,       // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body: body,
-		})
-	return err
-}
-func failOnError(err error, msg string) {
-	if err != nil {
-		panic(fmt.Sprintf("%s: %s", msg, err))
-	}
-}
+
+
+
