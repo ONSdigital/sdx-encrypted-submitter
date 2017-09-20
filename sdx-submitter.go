@@ -7,80 +7,78 @@ import (
 	"github.com/streadway/amqp"
 	"io/ioutil"
 	"os"
+	"gopkg.in/yaml.v2"
+	"path/filepath"
 )
 
+
+// config part read from command line and part from sdx-submitter.yml
+
+type Config struct{
+	Name string
+	Password string
+	Port int
+	Host string
+	Queue string
+	Exchange string
+	Vhost string
+	RoutingKey string
+	Url string
+	EncryptionKeyFile string
+	SigningKeyFile string
+	MessageFilePath string
+}
+
 func main() {
+
 	// Read a source file and place it on a rabbit topic exchange
 	// Exchange , Queue and binding must be in place before use
 
-	var url, exchange, routingKey, encryptionKey, signingKey, name, password string
-	var port, host, queue, vhost, messageFilePath string
+	var config Config
 	var msgBody []byte
+	var yamlFile []byte
 	var err error
 	const printMsgCharCount = 20 // only print the first few characters of the message
 
 	// access command line parameters
-
-	flag.StringVar(&name, "n", "", "name of the rabbit user")
-	flag.StringVar(&password, "p", "", "password of the rabbit user")
-	flag.StringVar(&port, "rport", "", "port used to connect to rabbit")
-	flag.StringVar(&host, "rhost", "", "hostname used to connect to rabbit")
-	flag.StringVar(&vhost, "v", "", "vhostname used to connect to rabbit")
-	flag.StringVar(&url, "u", "", "url connection string ")
-	flag.StringVar(&queue, "q", "", "name of the rabbit queue")
-	flag.StringVar(&exchange, "x", "", "name of the rabbit exchange")
-	flag.StringVar(&routingKey, "r", "", "rabbit routing key")
-	flag.StringVar(&encryptionKey, "e", "", "path to a private key file used for encryption")
-	flag.StringVar(&signingKey, "s", "", "path to a private key used for signing")
-	flag.StringVar(&messageFilePath, "f", "", "path to filename to send")
+	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
+	flag.StringVar(&config.Password, "p", "", "password of the rabbit user")
+	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a private key file used for encryption")
+	flag.StringVar(&config.SigningKeyFile, "s", "", "path to a private key used for signing")
+	flag.StringVar(&config.MessageFilePath, "f", "", "path to filename to send")
 
 	flag.Parse()
 
-	// If no value given on command line , then look at environment variables , else use a default value
+	// Get config file values
 
-	name = getFromEnvIfEmpty(name, "RABBITMQ_DEFAULT_USER", "guest")
-	password = getFromEnvIfEmpty(password, "RABBITMQ_DEFAULT_PASS", "guest")
-	port = getFromEnvIfEmpty(port, "RABBITMQ_PORT", "5672")
-	host = getFromEnvIfEmpty(host, "RABBITMQ_HOST", "localhost")
-	queue = getFromEnvIfEmpty(queue, "RABBIT_SURVEY_QUEUE", "rabbit")
-	exchange = getFromEnvIfEmpty(exchange, "RABBITMQ_EXCHANGE", "message")
-	vhost = getFromEnvIfEmpty(vhost, "RABBITMQ_DEFAULT_VHOST", "%2f")
+	configFileName, err := filepath.Abs("./sdx-submitter.yml")
+	exitOnError(err," cannot open ./sdx-submitter.yml")
 
-	if url == "" {
-		url = fmt.Sprintf("amqp://%s:%s@%s:%s/%s", name, password, host, port, vhost)
-	} else {
-		fmt.Println("url use overrides specific parameters") //A specific URL is set , so use it
-	}
+	yamlFile, err = ioutil.ReadFile(configFileName)
+	exitOnError(err, "unable to read from ./sdx-submitter")
 
-	msgBody, err = getBody(messageFilePath)
+	err = yaml.Unmarshal(yamlFile, &config)
+	exitOnError(err,"unable to marshal yamlin ./sdx-submitter.yml")
+
+	config.Url = fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
+
+	msgBody, err = getBody(config.MessageFilePath)
 	exitOnError(err, "could not read message body")
 
 	// If encyrpt specified then encrypt
 	// if sign specified then sign
 
-	err = sendToRabbit(url, exchange, queue, routingKey, msgBody)
+	err = sendToRabbit(config.Url, config.Exchange, config.RoutingKey, msgBody)
 	exitOnError(err, "unable to send message to rabbitmq")
 
 	var msgSize = len(msgBody)
 	if msgSize < printMsgCharCount {
-		fmt.Println(fmt.Sprintf("message:'%s' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody), msgSize, exchange, routingKey))
+		fmt.Println(fmt.Sprintf("message:'%s' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody), msgSize, config.Exchange, config.RoutingKey))
 	} else {
-		fmt.Println(fmt.Sprintf("message:'%s...' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody[0:printMsgCharCount]), msgSize, exchange, routingKey))
+		fmt.Println(fmt.Sprintf("message:'%s...' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody[0:printMsgCharCount]), msgSize, config.Exchange, config.RoutingKey))
 	}
 }
 
-func getFromEnvIfEmpty(target string, key string, defaultValue string) string {
-
-	if target != "" {
-		return target
-	}
-
-	if value, present := os.LookupEnv(key); present {
-		return value
-	}
-
-	return defaultValue
-}
 
 // Consider adding stdin reading here to support piping ?
 func getBody(file_path string) ([]byte, error) {
@@ -99,7 +97,7 @@ func getBody(file_path string) ([]byte, error) {
 	return msgBody, err
 }
 
-func sendToRabbit(url string, exchange string, queue string, routingKey string, msgBody []byte) error {
+func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte) error {
 
 	var conn *amqp.Connection
 	var ch *amqp.Channel
@@ -133,6 +131,6 @@ func sendToRabbit(url string, exchange string, queue string, routingKey string, 
 func exitOnError(err error, msg string) {
 	if err != nil {
 		fmt.Println("%s: %s", msg, err)
-		os.Exit(1) // No specific err codes atm
+		os.Exit(1)
 	}
 }
