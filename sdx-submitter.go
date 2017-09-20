@@ -39,6 +39,7 @@ func main() {
 	var yamlFile []byte
 	var err error
 	const printMsgCharCount = 20 // only print the first few characters of the message
+	const configFileName = "./sdx-submitter.yml"
 
 	// access command line parameters
 	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
@@ -51,14 +52,14 @@ func main() {
 
 	// Get config file values
 
-	configFileName, err := filepath.Abs("./sdx-submitter.yml")
-	exitOnError(err," cannot open ./sdx-submitter.yml")
+	configFile, err := filepath.Abs(configFileName)
+	exitOnError(err,fmt.Sprintf(" cannot open %s",configFileName))
 
-	yamlFile, err = ioutil.ReadFile(configFileName)
-	exitOnError(err, "unable to read from ./sdx-submitter")
+	yamlFile, err = ioutil.ReadFile(configFile)
+	exitOnError(err, fmt.Sprintf("unable to read from %s",configFileName))
 
 	err = yaml.Unmarshal(yamlFile, &config)
-	exitOnError(err,"unable to marshal yamlin ./sdx-submitter.yml")
+	exitOnError(err,fmt.Sprintf("unable to unMarshal yaml from %s",configFileName))
 
 	config.Url = fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
 
