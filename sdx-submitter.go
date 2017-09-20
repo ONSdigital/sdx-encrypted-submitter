@@ -5,63 +5,38 @@ import (
 	"flag"
 	"fmt"
 	"github.com/streadway/amqp"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
-	"gopkg.in/yaml.v2"
 	"path/filepath"
 )
 
-
 // config part read from command line and part from sdx-submitter.yml
 
-type Config struct{
-	Name string
-	Password string
-	Port int
-	Host string
-	Queue string
-	Exchange string
-	Vhost string
-	RoutingKey string
-	Url string
+type Config struct {
+	Name              string
+	Password          string
+	Port              int
+	Host              string
+	Queue             string
+	Exchange          string
+	Vhost             string
+	RoutingKey        string
+	Url               string
 	EncryptionKeyFile string
-	SigningKeyFile string
-	MessageFilePath string
+	SigningKeyFile    string
+	MessageFilePath   string
 }
-
-
 
 func main() {
 
 	// Read a source file and place it on a rabbit topic exchange
 	// Exchange , Queue and binding must be in place before use
-
 	var config Config
 	var msgBody []byte
-	var err error
-
-	config, err = getConfig()
-	exitOnError(err, "cannot read config")
-
-	msgBody, err = getBody(config.MessageFilePath)
-	exitOnError(err, "could not read message body")
-
-	// If encyrpt specified then encrypt
-	// if sign specified then sign
-
-	err = sendToRabbit(config.Url, config.Exchange, config.RoutingKey, msgBody)
-	exitOnError(err, "unable to send message to rabbitmq")
-
-	displaySuccess(msgBody, config)
-}
-
-func getConfig() (Config, error) {
-
-	const configFileName = "./sdx-submitter.yml"
-	var err error
 	var yamlFile []byte
-	var config Config
-
+	var err error
+	const configFileName = "./sdx-submitter.yml"
 
 	// access command line parameters
 	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
@@ -69,28 +44,34 @@ func getConfig() (Config, error) {
 	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a private key file used for encryption")
 	flag.StringVar(&config.SigningKeyFile, "s", "", "path to a private key used for signing")
 	flag.StringVar(&config.MessageFilePath, "f", "", "path to filename to send")
+
 	flag.Parse()
 
 	// Get config file values
+
 	configFile, err := filepath.Abs(configFileName)
-	if err != nil{
-		return config, errors.New(fmt.Sprintf("cannot open %s", configFileName))
-	}
+	exitOnError(err, fmt.Sprintf(" cannot open %s", configFileName))
 
 	yamlFile, err = ioutil.ReadFile(configFile)
-	if err != nil{
-		return config, errors.New(fmt.Sprintf("unable to read from %s", configFileName))
-	}
+	exitOnError(err, fmt.Sprintf("unable to read from %s", configFileName))
 
 	err = yaml.Unmarshal(yamlFile, &config)
-	if err != nil{
-		return config, errors.New(fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
-	}
+	exitOnError(err, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
 
 	config.Url = fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
 
-	return config, err
+	msgBody, err = getBody(config.MessageFilePath)
+	exitOnError(err, "could not read message body")
+
+	// If encrypt specified then encrypt
+	// if sign specified then sign
+
+	err = sendToRabbit(config.Url, config.Exchange, config.RoutingKey, msgBody)
+	exitOnError(err, "unable to send message to rabbitmq")
+
+	fmt.Println(fmt.Sprintf("message from file:'%s' published to exchange:'%s' using routing key:'%s'", config.MessageFilePath, config.Exchange, config.RoutingKey))
 }
+
 func exitOnError(err error, msg string) {
 	if err != nil {
 		fmt.Println("%s: %s", msg, err)
@@ -145,16 +126,3 @@ func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte
 
 	return err
 }
-
-func displaySuccess(msgBody []byte, config Config) {
-	// display success message to user
-	const printMsgCharCount = 20 // only print the first few characters of the message
-
-	var msgSize = len(msgBody)
-	if msgSize < printMsgCharCount {
-		fmt.Println(fmt.Sprintf("message:'%s' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody), msgSize, config.Exchange, config.RoutingKey))
-	} else {
-		fmt.Println(fmt.Sprintf("message:'%s...' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody[0:printMsgCharCount]), msgSize, config.Exchange, config.RoutingKey))
-	}
-}
-
