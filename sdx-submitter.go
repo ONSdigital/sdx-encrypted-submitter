@@ -1,168 +1,138 @@
 package main
-import(
-		"fmt"
-		"flag"
-		"github.com/streadway/amqp"
-		"os"
-		"io/ioutil"
+
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"github.com/streadway/amqp"
+	"io/ioutil"
+	"os"
 )
 
 func main() {
-
 	// Read a source file and place it on a rabbit topic exchange
-	var url, exchange, routing_key,    encryption_key,    signing_key, name, password string
-	var port, host , queue, vhost, message_path_and_file string
-	var msg_body []byte
+	// Exchange , Queue and binding must be in place before use
+
+	var url, exchange, routingKey, encryptionKey, signingKey, name, password string
+	var port, host, queue, vhost, messageFilePath string
+	var msgBody []byte
 	var err error
+	const PRINT_MSG_CHAR_COUNT = 20 // only print the first few characters of the message
 
-	getArguments(&name, &password, &port, &host, &url, &queue, &exchange, &routing_key, &encryption_key, &signing_key, &vhost, &message_path_and_file)
+	// access command line parameters
 
-	msg_body = getBody(message_path_and_file)
+	flag.StringVar(&name, "n", "", "name of the rabbit user")
+	flag.StringVar(&password, "p", "", "password of the rabbit user")
+	flag.StringVar(&port, "rport", "", "port used to connect to rabbit")
+	flag.StringVar(&host, "rhost", "", "hostname used to connect to rabbit")
+	flag.StringVar(&vhost, "v", "", "vhostname used to connect to rabbit")
+	flag.StringVar(&url, "u", "", "url connection string ")
+	flag.StringVar(&queue, "q", "", "name of the rabbit queue")
+	flag.StringVar(&exchange, "x", "", "name of the rabbit exchange")
+	flag.StringVar(&routingKey, "r", "", "rabbit routing key")
+	flag.StringVar(&encryptionKey, "e", "", "path to a private key file used for encryption")
+	flag.StringVar(&signingKey, "s", "", "path to a private key used for signing")
+	flag.StringVar(&messageFilePath, "f", "", "path to filename to send")
+
+	flag.Parse()
+
+	// If no value given on command line , then look at environment variables , else use a default value
+
+	name = getFromEnvIfEmpty(name, "RABBITMQ_DEFAULT_USER", "guest")
+	password = getFromEnvIfEmpty(password, "RABBITMQ_DEFAULT_PASS", "guest")
+	port = getFromEnvIfEmpty(port, "RABBITMQ_PORT", "5672")
+	host = getFromEnvIfEmpty(host, "RABBITMQ_HOST", "localhost")
+	queue = getFromEnvIfEmpty(queue, "RABBIT_SURVEY_QUEUE", "rabbit")
+	exchange = getFromEnvIfEmpty(exchange, "RABBITMQ_EXCHANGE", "message")
+	vhost = getFromEnvIfEmpty(vhost, "RABBITMQ_DEFAULT_VHOST", "%2f")
+
+	if url == "" {
+		url = fmt.Sprintf("amqp://%s:%s@%s:%s/%s", name, password, host, port, vhost)
+	} else {
+		fmt.Println("url use overrides specific parameters") //A specific URL is set , so use it
+	}
+
+	msgBody, err = getBody(messageFilePath)
+	failOnError(err, "could not read message body")
 
 	// If encyrpt specified then encrypt
 	// if sign specified then sign
 
-	sendToRabbit(url, exchange, queue, routing_key, err, msg_body)
-	
-}
+	err = sendToRabbit(url, exchange, queue, routingKey, msgBody)
+	failOnError(err, "unable to send message to rabbitmq")
 
-func getArguments(name *string,
-	password *string,
-	port *string,
-	host *string,
-	url *string,
-	queue *string,
-	exchange *string,
-	routing_key *string,
-	encryption_key *string,
-	signing_key *string,
-	vhost *string,
-	message_path_and_file *string)  {
-	// define the command line parameters
-	flag.StringVar(name, "n", "", "name of the rabbit user")
-	flag.StringVar(password, "p", "", "password of the rabbit user")
-	flag.StringVar(port, "rport", "", "port used to connect to rabbit")
-	flag.StringVar(host, "rhost", "localhost", "hostname used to connect to rabbit")
-	flag.StringVar(vhost, "v", "", "vhostname used to connect to rabbit")
-	flag.StringVar(url, "u", "", "url connection string ")
-	flag.StringVar(queue, "q", "", "name of the rabbit queue")
-	flag.StringVar(exchange, "x", "message", "name of the rabbit exchange")
-	flag.StringVar(routing_key, "r", "sdx-made-up-routing-key", "rabbit routing key")
-	flag.StringVar(encryption_key, "e", "sdx-made-encryption_key", "path to a private key file used for encryption")
-	flag.StringVar(signing_key, "s", "sdx-made-signing_key", "path to a private key used for signing")
-	flag.StringVar(message_path_and_file, "f", "", "path to filename to send")
-	flag.Parse()
-	// Use values from environment variables if no value empty
-	getFromEnvIfEmpty(name, "RABBITMQ_DEFAULT_USER", "guest")
-	getFromEnvIfEmpty(password, "RABBITMQ_DEFAULT_PASS", "guest")
-	getFromEnvIfEmpty(port, "RABBITMQ_PORT", "5672")
-	getFromEnvIfEmpty(host, "RABBITMQ_HOST", "rabbit")
-	getFromEnvIfEmpty(queue, "RABBIT_SURVEY_QUEUE", "rabbit")
-	getFromEnvIfEmpty(exchange, "RABBITMQ_EXCHANGE", "rabbit")
-	getFromEnvIfEmpty(vhost, "RABBITMQ_DEFAULT_VHOST", "%2f")
-	if *url == "" {
-		*url = fmt.Sprintf("amqp://%s:%s@%s:%s/%s", *name, *password, *host, *port, *vhost)
+	var msgSize = len(msgBody)
+	if msgSize < PRINT_MSG_CHAR_COUNT {
+		fmt.Println(fmt.Sprintf("message:'%s' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody), msgSize, exchange, routingKey))
 	} else {
-		fmt.Println("Url use overrides specific parameters") //A specific URL is set , so use it
+		fmt.Println(fmt.Sprintf("message:'%s...' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody[0:PRINT_MSG_CHAR_COUNT]), msgSize, exchange, routingKey))
 	}
 }
 
-func getFromEnvIfEmpty(target *string, key string, defaultValue string)  {
-	if *target == "" {
-		if value, present := os.LookupEnv(key); present {
-			*target = value
-		} else {
-			*target = defaultValue
-		}
+func getFromEnvIfEmpty(target string, key string, defaultValue string) string {
+
+	if target != "" {
+		return target
 	}
+
+	if value, present := os.LookupEnv(key); present {
+		return value
+	}
+
+	return defaultValue
 }
 
-// Consider adding StdIn reading here to support piping ?
-func getBody(file_path string)([]byte){
-	var msg_body []byte
+// Consider adding stdin reading here to support piping ?
+func getBody(file_path string) ([]byte, error) {
+	var msgBody []byte
 	var err error
-	if len(file_path) != 0 {
-		msg_body, err = ioutil.ReadFile(file_path)
-		failOnError(err, "Cannot read from file")
-	} else {panic("No file name supplied")}  // Only mandatory until we support piping
-	return msg_body
+
+	if len(file_path) == 0 {
+		return nil, errors.New("no file name supplied")
+	}
+
+	msgBody, err = ioutil.ReadFile(file_path)
+	if err != nil {
+		return nil, err
+	}
+
+	return msgBody, err
 }
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		panic(fmt.Sprintf("%s: %s", msg, err))
+		fmt.Println("%s: %s", msg, err)
+		os.Exit(1) // No specific err codes atm
 	}
 }
 
-func sendToRabbit(url string, exchange string, queue string, routing_key string, err error, msg_body []byte) {
-	// Connect to Rabbit
-	conn, err := amqp.Dial(url)
-	failOnError(err, "Failed to connect to RabbitMQ")
-	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
+func sendToRabbit(url string, exchange string, queue string, routingKey string, msgBody []byte) error {
 
+	var conn *amqp.Connection
+	var ch *amqp.Channel
+	var err error
+
+	conn, err = amqp.Dial(url)
 	defer conn.Close()
+	if err != nil {
+		return err
+	}
+
+	ch, err = conn.Channel()
 	defer ch.Close()
-
-
-	// REMOVE THIS CODE !!!  Do not Declare in prod - must exist Prior to run ?
-	rabbitPrepare(ch, exchange, queue, routing_key)
-	// END OF CODE TO REMOVE
-
+	if err != nil {
+		return err
+	}
 
 	err = ch.Publish(
-		exchange,    // exchange
-		routing_key, // routing key
-		false,       // mandatory
-		false,       // immediate
+		exchange,   // exchange
+		routingKey, // routing key
+		false,      // mandatory
+		false,      // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body: msg_body,
+			Body:        msgBody,
 		})
 
-	failOnError(err, "Failed to publish a message")
+	return err
 }
-
-
-
-
-// Not for Prod
-func rabbitPrepare(ch *amqp.Channel, exchange string, queue string, routing_key string)  {
-	err := ch.ExchangeDeclare(
-		exchange, // name
-		"topic",
-		true,  // durable
-		false, // auto-deleted
-		false, // internal
-		false, // no-wait
-		nil,   // arguments
-	)
-	failOnError(err, "Failed to declare an exchange")
-	q, err := ch.QueueDeclare(
-		queue, // name
-		false,   // durable
-		false,   // delete when unused
-		false,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
-	)
-	Use(q)
-	failOnError(err, "Could not create queue ")
-	err = ch.QueueBind(
-		queue,       // queue name
-		routing_key, // routing key
-		exchange,    // exchange
-		false,
-		nil)
-	failOnError(err, fmt.Sprintf("could not bind queue %s to exchange %s", queue, exchange))
-}
-
-func Use(vals ...interface{}) {
-	for _, val := range vals {
-		_ = val
-	}
-}
-// End of Not for Prod
-
-
-
