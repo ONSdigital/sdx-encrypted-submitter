@@ -17,7 +17,7 @@ func main() {
 	var port, host, queue, vhost, messageFilePath string
 	var msgBody []byte
 	var err error
-	const PRINT_MSG_CHAR_COUNT = 20 // only print the first few characters of the message
+	const printMsgCharCount = 20 // only print the first few characters of the message
 
 	// access command line parameters
 
@@ -53,19 +53,19 @@ func main() {
 	}
 
 	msgBody, err = getBody(messageFilePath)
-	failOnError(err, "could not read message body")
+	exitOnError(err, "could not read message body")
 
 	// If encyrpt specified then encrypt
 	// if sign specified then sign
 
 	err = sendToRabbit(url, exchange, queue, routingKey, msgBody)
-	failOnError(err, "unable to send message to rabbitmq")
+	exitOnError(err, "unable to send message to rabbitmq")
 
 	var msgSize = len(msgBody)
-	if msgSize < PRINT_MSG_CHAR_COUNT {
+	if msgSize < printMsgCharCount {
 		fmt.Println(fmt.Sprintf("message:'%s' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody), msgSize, exchange, routingKey))
 	} else {
-		fmt.Println(fmt.Sprintf("message:'%s...' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody[0:PRINT_MSG_CHAR_COUNT]), msgSize, exchange, routingKey))
+		fmt.Println(fmt.Sprintf("message:'%s...' (len=%d) published to exchange:'%s' using routing key:'%s'", string(msgBody[0:printMsgCharCount]), msgSize, exchange, routingKey))
 	}
 }
 
@@ -99,13 +99,6 @@ func getBody(file_path string) ([]byte, error) {
 	return msgBody, err
 }
 
-func failOnError(err error, msg string) {
-	if err != nil {
-		fmt.Println("%s: %s", msg, err)
-		os.Exit(1) // No specific err codes atm
-	}
-}
-
 func sendToRabbit(url string, exchange string, queue string, routingKey string, msgBody []byte) error {
 
 	var conn *amqp.Connection
@@ -135,4 +128,11 @@ func sendToRabbit(url string, exchange string, queue string, routingKey string, 
 		})
 
 	return err
+}
+
+func exitOnError(err error, msg string) {
+	if err != nil {
+		fmt.Println("%s: %s", msg, err)
+		os.Exit(1) // No specific err codes atm
+	}
 }
