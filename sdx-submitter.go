@@ -11,14 +11,13 @@ import (
 	"path/filepath"
 )
 
-// config part read from command line and part from sdx-submitter.yml
+// Config part read from command line and part from sdx-submitter.yml
 
 type Config struct {
 	Name              string
 	Password          string
 	Port              int
 	Host              string
-	Queue             string
 	Exchange          string
 	Vhost             string
 	RoutingKey        string
@@ -32,13 +31,14 @@ func main() {
 
 	// Read a source file and place it on a rabbit topic exchange
 	// Exchange , Queue and binding must be in place before use
+
 	var config Config
 	var msgBody []byte
 	var yamlFile []byte
-	var err error
 	const configFileName = "./sdx-submitter.yml"
 
 	// access command line parameters
+
 	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
 	flag.StringVar(&config.Password, "p", "", "password of the rabbit user")
 	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a private key file used for encryption")
@@ -50,7 +50,7 @@ func main() {
 	// Get config file values
 
 	configFile, err := filepath.Abs(configFileName)
-	exitOnError(err, fmt.Sprintf(" cannot open %s", configFileName))
+	exitOnError(err, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
 
 	yamlFile, err = ioutil.ReadFile(configFile)
 	exitOnError(err, fmt.Sprintf("unable to read from %s", configFileName))
