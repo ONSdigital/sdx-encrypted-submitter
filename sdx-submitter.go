@@ -16,16 +16,15 @@ import (
 type config struct {
 	Name              string
 	Password          string
-	Port              int		`yaml:"port"`
-	Host              string	`yaml:"host"`
-	Exchange          string	`yaml:"exchange"`
-	Vhost             string	`yaml:"vhost"`
-	RoutingKey        string	`yaml:"routingkey"`
+	Port              int    `yaml:"port"`
+	Host              string `yaml:"host"`
+	Exchange          string `yaml:"exchange"`
+	Vhost             string `yaml:"vhost"`
+	RoutingKey        string `yaml:"routingkey"`
 	EncryptionKeyFile string
 	SigningKeyFile    string
 	MessageFilePath   string
 }
-
 
 const configFileName = "./sdx-submitter.yml"
 
@@ -57,7 +56,7 @@ func main() {
 	marshalError := yaml.Unmarshal(yamlFile, &config)
 	exitOnError(marshalError, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
 
-	message , messageError := getMessage(config.MessageFilePath)
+	message, messageError := getMessage(config.MessageFilePath)
 	exitOnError(messageError, "could not read message body")
 
 	// If encrypt specified then encrypt
@@ -78,15 +77,15 @@ func exitOnError(err error, msg string) {
 }
 
 // Consider adding stdin reading here to support piping ?
-func getMessage(file_path string) ([]byte, error) {
+func getMessage(filePath string) ([]byte, error) {
 	var msgBody []byte
 	var err error
 
-	if len(file_path) == 0 {
+	if len(filePath) == 0 {
 		return nil, errors.New("no file name supplied")
 	}
 
-	msgBody, err = ioutil.ReadFile(file_path)
+	msgBody, err = ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
