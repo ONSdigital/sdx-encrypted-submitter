@@ -13,29 +13,28 @@ import (
 
 // Config part read from command line and part from sdx-submitter.yml
 
-type Config struct {
+type config struct {
 	Name              string
 	Password          string
-	Port              int
-	Host              string
-	Exchange          string
-	Vhost             string
-	RoutingKey        string
-	Url               string
+	Port              int		`yaml:"port"`
+	Host              string	`yaml:"host"`
+	Exchange          string	`yaml:"exchange"`
+	Vhost             string	`yaml:"vhost"`
+	RoutingKey        string	`yaml:"routingkey"`
 	EncryptionKeyFile string
 	SigningKeyFile    string
 	MessageFilePath   string
 }
+
+
+const configFileName = "./sdx-submitter.yml"
 
 func main() {
 
 	// Read a source file and place it on a rabbit topic exchange
 	// Exchange , Queue and binding must be in place before use
 
-	var config Config
-	var msgBody []byte
-	var yamlFile []byte
-	const configFileName = "./sdx-submitter.yml"
+	var config config
 
 	// access command line parameters
 
@@ -49,27 +48,26 @@ func main() {
 
 	// Get config file values
 
-	configFile, err := filepath.Abs(configFileName)
-	exitOnError(err, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
+	configFile, filepathError := filepath.Abs(configFileName)
+	exitOnError(filepathError, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
 
-	yamlFile, err = ioutil.ReadFile(configFile)
-	exitOnError(err, fmt.Sprintf("unable to read from %s", configFileName))
+	yamlFile, readfileError := ioutil.ReadFile(configFile)
+	exitOnError(readfileError, fmt.Sprintf("unable to read from %s", configFileName))
 
-	err = yaml.Unmarshal(yamlFile, &config)
-	exitOnError(err, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
+	marshalError := yaml.Unmarshal(yamlFile, &config)
+	exitOnError(marshalError, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
 
-	config.Url = fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
-
-	msgBody, err = getBody(config.MessageFilePath)
-	exitOnError(err, "could not read message body")
+	message , messageError := getMessage(config.MessageFilePath)
+	exitOnError(messageError, "could not read message body")
 
 	// If encrypt specified then encrypt
 	// if sign specified then sign
 
-	err = sendToRabbit(config.Url, config.Exchange, config.RoutingKey, msgBody)
-	exitOnError(err, "unable to send message to rabbitmq")
+	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
+	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, message)
+	exitOnError(rabbitError, "unable to send message to rabbitmq")
 
-	fmt.Println(fmt.Sprintf("message from file:'%s' published to exchange:'%s' using routing key:'%s'", config.MessageFilePath, config.Exchange, config.RoutingKey))
+	fmt.Printf("message from file:'%s' published to exchange:'%s' using routing key:'%s\n", config.MessageFilePath, config.Exchange, config.RoutingKey)
 }
 
 func exitOnError(err error, msg string) {
@@ -80,7 +78,7 @@ func exitOnError(err error, msg string) {
 }
 
 // Consider adding stdin reading here to support piping ?
-func getBody(file_path string) ([]byte, error) {
+func getMessage(file_path string) ([]byte, error) {
 	var msgBody []byte
 	var err error
 
@@ -93,7 +91,7 @@ func getBody(file_path string) ([]byte, error) {
 		return nil, err
 	}
 
-	return msgBody, err
+	return msgBody, nil
 }
 
 func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte) error {
