@@ -50,19 +50,30 @@ Name | Description | Mandatory
 ### Examples
 ```
 sdx-submitter -n RabbitUser  -p RabbitPassword  -f EncryptedAndSignedFile
-Reads the file and writes to the exchange specified in the sdx-submitter.yml file, using the routing key specified there.
 ```
+Reads the file and writes to the exchange specified in the sdx-submitter.yml file, using the routing key specified there.
+
 ```
 sdx-submitter -h  
-Shows command line help
 ```
+Shows command line help
+
+```
+port: 5672
+host: "localhost"
+exchange: "message"
+vhost: "%2f"
+routingkey: "survey"
+
+```
+Example sdx-submitter.yml working locally on developer machine
+
 
 ### Coming soon to a terminal near you ........
 ```
 sdx-submitter -n RabbitUser  -p RabbitPassword  -f EncryptedAndSignedFile -e EncryptFile
-Reads the file content and encrypt using the key file content 
-
 ```
+Reads the file content and encrypt using the key file content 
 
 
 
