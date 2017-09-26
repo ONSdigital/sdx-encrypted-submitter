@@ -20,13 +20,13 @@ go build
 * Assumes exchanges , queues and bindings are in place . Does NOT create them if they are not.
 
 
-### Useage
+### Usage
 
 Arguments for use are split between sdx-encrypted-submitter.yml and command line arguments
 
 #### Config file settings (sdx-encrypted-submitter.yml) 
 
-Name | Default
+Name | Description
 -----|--------- 
 port|The rabbit port to use 
 host|The ip of the rabbit queue host
@@ -36,7 +36,7 @@ routingkey|The routing key to use when saving the message
 
 #### Command line arguments
 
-Name | Default | Mandatory
+Name | Description | Mandatory
 -----|---------|----------
 -n|Name to use when connecting to rabbit|Yes
 -p|Password to use when connecting to rabbit|Yes
