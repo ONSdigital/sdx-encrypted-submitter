@@ -28,11 +28,6 @@ type config struct {
 
 const configFileName = "./sdx-submitter.yml"
 
-var testArgs []string // testArgs not exported , used for testing only
-type exitHandler func(string)
-
-var onExit exitHandler = printErrorAndExit
-
 func main() {
 
 	// Read a source file and place it on a rabbit topic exchange
@@ -40,14 +35,7 @@ func main() {
 
 	var config config
 
-	//  Use testArgs if supplied ahead of command line
-
-	a := os.Args[1:]
-	if testArgs != nil {
-		a = testArgs
-	}
-
-	// Access command line parameters
+	// access command line parameters
 
 	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
 	flag.StringVar(&config.Password, "p", "", "password of the rabbit user")
@@ -55,43 +43,37 @@ func main() {
 	flag.StringVar(&config.SigningKeyFile, "s", "", "path to a private key used for signing")
 	flag.StringVar(&config.MessageFilePath, "f", "", "path to filename to send")
 
-	flag.CommandLine.Parse(a)
+	flag.Parse()
 
 	// Get config file values
 
 	configFile, filepathError := filepath.Abs(configFileName)
-	errorHandler(filepathError, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
+	exitOnError(filepathError, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
 
 	yamlFile, readfileError := ioutil.ReadFile(configFile)
-	errorHandler(readfileError, fmt.Sprintf("unable to read from %s", configFileName))
+	exitOnError(readfileError, fmt.Sprintf("unable to read from %s", configFileName))
 
 	marshalError := yaml.Unmarshal(yamlFile, &config)
-	errorHandler(marshalError, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
+	exitOnError(marshalError, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
 
 	message, messageError := getMessage(config.MessageFilePath)
-	errorHandler(messageError, "could not read message body")
+	exitOnError(messageError, "could not read message body")
 
 	// If encrypt specified then encrypt
 	// if sign specified then sign
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
 	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, message)
-	errorHandler(rabbitError, "unable to send message to rabbitmq")
+	exitOnError(rabbitError, "unable to send message to rabbitmq")
 
 	fmt.Printf("message from file:'%s' published to exchange:'%s' using routing key:'%s\n", config.MessageFilePath, config.Exchange, config.RoutingKey)
-
 }
 
-func errorHandler(err error, msg string) {
+func exitOnError(err error, msg string) {
 	if err != nil {
-		errorMessage := fmt.Sprintf("%s: %s", msg, err)
-		onExit(errorMessage)
+		fmt.Println("%s: %s", msg, err)
+		os.Exit(1)
 	}
-}
-
-func printErrorAndExit(msg string) {
-	fmt.Println("%s", msg)
-	os.Exit(1)
 }
 
 // Consider adding stdin reading here to support piping ?
