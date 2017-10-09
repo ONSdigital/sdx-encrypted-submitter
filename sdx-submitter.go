@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sdx-encrypted-submitter/authentication"
 )
 
 // Config part read from command line and part from sdx-submitter.yml
@@ -28,6 +30,8 @@ type config struct {
 
 const configFileName = "./sdx-submitter.yml"
 
+var testArgs []string // testArgs not exported , used for testing only
+
 func main() {
 
 	// Read a source file and place it on a rabbit topic exchange
@@ -35,15 +39,25 @@ func main() {
 
 	var config config
 
+	//  Use testArgs if supplied ahead of command line
+	a := os.Args[1:]
+	if testArgs != nil {
+		a = testArgs
+	}
+
 	// access command line parameters
 
 	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
 	flag.StringVar(&config.Password, "p", "", "password of the rabbit user")
-	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a private key file used for encryption")
+	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a public key file used for encryption")
 	flag.StringVar(&config.SigningKeyFile, "s", "", "path to a private key used for signing")
 	flag.StringVar(&config.MessageFilePath, "f", "", "path to filename to send")
 
-	flag.Parse()
+	flag.CommandLine.Parse(a)
+
+	if (config.EncryptionKeyFile == "" && config.SigningKeyFile != "") || (config.EncryptionKeyFile != "" && config.SigningKeyFile == "") {
+		exitOnError(errors.New("only one of encryption or signing key defined "), "either both or neither encryption and signing keys required")
+	}
 
 	// Get config file values
 
@@ -56,11 +70,18 @@ func main() {
 	marshalError := yaml.Unmarshal(yamlFile, &config)
 	exitOnError(marshalError, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
 
-	message, messageError := getMessage(config.MessageFilePath)
+	message, messageError := getRawMessage(config.MessageFilePath)
 	exitOnError(messageError, "could not read message body")
 
-	// If encrypt specified then encrypt
-	// if sign specified then sign
+	if config.SigningKeyFile != "" { // Used to detect if signing and encrypting required
+		var mappedData map[string]interface{}
+		fileErr := json.Unmarshal(message, &mappedData) //file contents are arbitrary Json
+		exitOnError(fileErr, "Could not marshal Json from input file")
+
+		jwe, tokenError := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
+		message = []byte(jwe)
+		exitOnError((*tokenError).From, (*tokenError).Desc)
+	}
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
 	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, message)
@@ -71,13 +92,13 @@ func main() {
 
 func exitOnError(err error, msg string) {
 	if err != nil {
-		fmt.Println("%s: %s", msg, err)
+		fmt.Println(msg, " - ", err)
 		os.Exit(1)
 	}
 }
 
 // Consider adding stdin reading here to support piping ?
-func getMessage(filePath string) ([]byte, error) {
+func getRawMessage(filePath string) ([]byte, error) {
 	var msgBody []byte
 	var err error
 
