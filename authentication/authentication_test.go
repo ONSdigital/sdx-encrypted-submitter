@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"path/filepath"
 	"testing"
 )
 
@@ -53,14 +54,24 @@ func TestJWT(t *testing.T) {
 		t.Error("unmarshal error", err)
 	}
 
-	jwe, jerr := GetJwe(mappedData, "/Users/andrewtorrance/go/src/sdx-encrypted-submitter/authentication/testPrivateKey.pem",
-		"/Users/andrewtorrance/go/src/sdx-encrypted-submitter/authentication/testPublicKey.pem")
+	privateKeyFilePath, cpkErr := filepath.Abs("./testPrivateKey.pem")
+	if cpkErr != nil {
+		t.Error("Cannot get private key path", cpkErr)
+	}
+
+	publicKeyFilePath, cpkErr := filepath.Abs("./testPublicKey.pem")
+	if cpkErr != nil {
+		t.Error("Cannot get public key path", cpkErr)
+	}
+
+	jwe, jerr := GetJwe(mappedData, privateKeyFilePath, publicKeyFilePath)
+
 	if jerr != nil {
 		t.Error("GetJwe returned Error: ", jerr)
 	}
 
-	publicKeyResult, _ := loadEncryptionKey("/Users/andrewtorrance/go/src/sdx-encrypted-submitter/authentication/testPublicKey.pem")
-	privateKeyResult, _ := loadSigningKey("/Users/andrewtorrance/go/src/sdx-encrypted-submitter/authentication/testPrivateKey.pem")
+	publicKeyResult, _ := loadEncryptionKey(publicKeyFilePath)
+	privateKeyResult, _ := loadSigningKey(privateKeyFilePath)
 
 	parsedData, err := jwt.ParseSignedAndEncrypted(jwe)
 	if err != nil {
@@ -83,11 +94,10 @@ func TestJWT(t *testing.T) {
 		t.Error("Could not marshal  Jwe:", err)
 	}
 
-	// Note to self:
-	// It is not obvious how to compare result with expected , the mapping process does not maintain order (by design)
-	// and we do not have a type that we can use therefore this test is far from satisfactory at this point
-	if len(string(result)) != len(expected.String()) {
+	// Comparing result with expected is not simple as the Json is meant to be of an unknown format
+	// the mapping process does not maintain order (by design)
+	expectedString := expected.String()
+	if len(string(result)) != len(expectedString) {
 		t.Error("Result and Expected Do not Match ")
 	}
-
 }

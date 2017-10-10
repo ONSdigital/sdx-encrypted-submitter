@@ -32,13 +32,12 @@ func TestSupplyingUnknownArgument(t *testing.T) {
 
 	var actual = string(output)
 	if !strings.Contains(actual, expected) {
-		t.Error("'",expected, "' not in the output ")
+		t.Error("'", expected, "' not in the output ")
 	}
 }
 
-
 func TestUnableToReadSourceFile(t *testing.T) {
-	cmd := exec.Command("sdx-encrypted-submitter","-f","AFileThatClearlyDoesNotExist")
+	cmd := exec.Command("sdx-encrypted-submitter", "-f", "AFileThatClearlyDoesNotExist")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
@@ -47,8 +46,6 @@ func TestUnableToReadSourceFile(t *testing.T) {
 
 	var actual = string(output)
 	if !strings.Contains(actual, expected) {
-		t.Error("'",expected, "' not in the output ")
+		t.Error("'", expected, "' not in the output ")
 	}
 }
-
-

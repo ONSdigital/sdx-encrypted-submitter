@@ -43,7 +43,7 @@ func GetJwe(rawClaims interface{}, signingKeyPath string, encryptionKeyPath stri
 		return "", &TokenError{Desc: "Error creating JWT signer", From: err}
 	}
 
-	token,err := jwt.SignedAndEncrypted(signer, encrypter).Claims(rawClaims).CompactSerialize()
+	token, err := jwt.SignedAndEncrypted(signer, encrypter).Claims(rawClaims).CompactSerialize()
 
 	if err != nil {
 		return "", &TokenError{Desc: "Error signing and encrypting JWT", From: err}
@@ -114,8 +114,6 @@ func loadEncryptionKey(encryptionKeyPath string) (*PublicKeyResult, *KeyLoadErro
 
 	return &PublicKeyResult{publicKey, kid}, nil
 }
-
-
 
 // TokenError describes an error that can occur during JWT generation
 type TokenError struct {

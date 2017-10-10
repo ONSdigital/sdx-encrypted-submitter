@@ -38,6 +38,7 @@ func main() {
 	// Exchange , Queue and binding must be in place before use
 
 	var config config
+	var txID string
 
 	//  Use testArgs if supplied ahead of command line
 	a := os.Args[1:]
@@ -55,8 +56,12 @@ func main() {
 
 	flag.CommandLine.Parse(a)
 
-	if (config.EncryptionKeyFile == "" && config.SigningKeyFile != "") || (config.EncryptionKeyFile != "" && config.SigningKeyFile == "") {
-		exitOnError(errors.New("only one of encryption or signing key defined "), "either both or neither encryption and signing keys required")
+	if config.EncryptionKeyFile == "" {
+		exitOnError(errors.New("encryption key file not supplied"), "encryption key required")
+	}
+
+	if config.SigningKeyFile == "" {
+		exitOnError(errors.New("signing key file not supplied"), "signing key required")
 	}
 
 	// Get config file values
@@ -73,18 +78,20 @@ func main() {
 	message, messageError := getRawMessage(config.MessageFilePath)
 	exitOnError(messageError, "could not read message body")
 
-	if config.SigningKeyFile != "" { // Used to detect if signing and encrypting required
-		var mappedData map[string]interface{}
-		fileErr := json.Unmarshal(message, &mappedData) //file contents are arbitrary Json
-		exitOnError(fileErr, "Could not marshal Json from input file")
+	var mappedData map[string]interface{}
+	fileErr := json.Unmarshal(message, &mappedData) //file contents are arbitrary Json
+	txID = fmt.Sprintf("%v", mappedData["tx_id"])
+	exitOnError(fileErr, "Could not marshal Json from input file")
 
-		jwe, tokenError := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
-		message = []byte(jwe)
-		exitOnError((*tokenError).From, (*tokenError).Desc)
+	jwe, tokenError := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
+	message = []byte(jwe)
+	if tokenError != nil {
+		exitOnError(errors.New(""), fmt.Sprintf("%s %s", (*tokenError).From, (*tokenError).Desc))
+
 	}
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
-	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, message)
+	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, txID, message)
 	exitOnError(rabbitError, "unable to send message to rabbitmq")
 
 	fmt.Printf("message from file:'%s' published to exchange:'%s' using routing key:'%s\n", config.MessageFilePath, config.Exchange, config.RoutingKey)
@@ -114,7 +121,7 @@ func getRawMessage(filePath string) ([]byte, error) {
 	return msgBody, nil
 }
 
-func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte) error {
+func sendToRabbit(url string, exchange string, routingKey string, txID string, msgBody []byte) error {
 
 	var conn *amqp.Connection
 	var ch *amqp.Channel
@@ -132,6 +139,7 @@ func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte
 		return err
 	}
 
+	var headers = amqp.Table{"tx_id": txID}
 	err = ch.Publish(
 		exchange,   // exchange
 		routingKey, // routing key
@@ -140,6 +148,7 @@ func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        msgBody,
+			Headers:     headers,
 		})
 
 	return err
