@@ -4,3 +4,5 @@ go:
   - master
 
 script:
+  - ./lint.sh
+  - go test -v ./authentication
