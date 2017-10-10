@@ -83,7 +83,7 @@ Name | Description | Mandatory
 
 ### Examples
 ```
-sdx-submitter -n RabbitUser  -p RabbitPassword  -f SourceFile -e encryption_key_pem_file -s signing_key_pem_file
+sdx-encrypted-submitter -n RabbitUser  -p RabbitPassword  -f SourceFile -e encryption_key_pem_file -s signing_key_pem_file
 ```
 
 Reads the file encrypts and signs the contents and writes to the exchange specified in the sdx-encrypted-submitter.yml file, using the routing key specified there.
@@ -101,14 +101,8 @@ vhost: "%2f"
 routingkey: "survey"
 
 ```
-Example sdx-submitter.yml working locally on developer machine
+Example sdx-encrypted-submitter.yml working locally on developer machine
 
-
-### Coming soon to a terminal near you ........
-```
-sdx-submitter -n RabbitUser  -p RabbitPassword  -f EncryptedAndSignedFile -e EncryptFile
-```
-Reads the file content and encrypt using the key file content 
 
 ### License
 
