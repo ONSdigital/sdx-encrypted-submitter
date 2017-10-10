@@ -86,7 +86,7 @@ Name | Description | Mandatory
 sdx-submitter -n RabbitUser  -p RabbitPassword  -f SourceFile -e encryption_key_pem_file -s signing_key_pem_file
 ```
 
-Reads the file encrypts and signs the contents and writes to the exchange specified in the sdx-submitter.yml file, using the routing key specified there.
+Reads the file encrypts and signs the contents and writes to the exchange specified in the sdx-encrypted-submitter.yml file, using the routing key specified there.
 
 ```
 sdx-submitter -h  

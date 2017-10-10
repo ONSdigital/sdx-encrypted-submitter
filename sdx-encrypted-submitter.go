@@ -10,10 +10,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sdx-submitter/authentication"
+	"sdx-encrypted-submitter/authentication"
 )
 
-// Config part read from command line and part from sdx-submitter.yml
+// Config part read from command line and part from sdx-encrypted-submitter.yml
 
 type config struct {
 	Name              string
@@ -28,7 +28,7 @@ type config struct {
 	MessageFilePath   string
 }
 
-const configFileName = "./sdx-submitter.yml"
+const configFileName = "./sdx-encrypted-submitter.yml"
 
 var testArgs []string // testArgs not exported , used for testing only
 

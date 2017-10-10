@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-// Note these are integration tests that assume that the sdx-submitter has been installed
+// Note these are integration tests that assume that the sdx-encrypted-submitter has been installed
 
 func TestNotSupplyingAnyArgument(t *testing.T) {
 
-	cmd := exec.Command("sdx-submitter")
+	cmd := exec.Command("sdx-encrypted-submitter", "-e","something.txt", "-s", "somethingelse.txt")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
@@ -23,7 +23,7 @@ func TestNotSupplyingAnyArgument(t *testing.T) {
 }
 
 func TestSupplyingUnknownArgument(t *testing.T) {
-	cmd := exec.Command("sdx-submitter", "-Y")
+	cmd := exec.Command("sdx-encrypted-submitter", "-Y")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
@@ -37,7 +37,7 @@ func TestSupplyingUnknownArgument(t *testing.T) {
 }
 
 func TestUnableToReadSourceFile(t *testing.T) {
-	cmd := exec.Command("sdx-submitter", "-f", "AFileThatClearlyDoesNotExist")
+	cmd := exec.Command("sdx-encrypted-submitter", "-f", "AFileThatClearlyDoesNotExist","-e","something.txt", "-s", "somethingelse.txt")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
