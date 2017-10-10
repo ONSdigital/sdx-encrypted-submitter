@@ -87,7 +87,6 @@ func main() {
 	message = []byte(jwe)
 	if tokenError != nil {
 		exitOnError(errors.New(""), fmt.Sprintf("%s %s", (*tokenError).From, (*tokenError).Desc))
-
 	}
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
@@ -104,7 +103,7 @@ func exitOnError(err error, msg string) {
 	}
 }
 
-// Consider adding stdin reading here to support piping ?
+//TODO Consider adding stdin reading here to support piping ?
 func getRawMessage(filePath string) ([]byte, error) {
 	var msgBody []byte
 	var err error
