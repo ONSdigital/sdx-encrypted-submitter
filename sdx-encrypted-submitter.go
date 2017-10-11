@@ -14,7 +14,6 @@ import (
 )
 
 // Config part read from command line and part from sdx-encrypted-submitter.yml
-
 type config struct {
 	Name              string
 	Password          string
@@ -34,7 +33,7 @@ var testArgs []string // testArgs not exported , used for testing only
 
 func main() {
 
-	// Read a source file and place it on a rabbit topic exchange
+	// Read a source file of raw Json wrap it in a JWE/JWT and place it on a rabbit topic exchange
 	// Exchange , Queue and binding must be in place before use
 
 	var config config
@@ -65,7 +64,6 @@ func main() {
 	}
 
 	// Get config file values
-
 	configFile, filepathError := filepath.Abs(configFileName)
 	exitOnError(filepathError, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
 
@@ -80,13 +78,17 @@ func main() {
 
 	var mappedData map[string]interface{}
 	fileErr := json.Unmarshal(message, &mappedData) //file contents are arbitrary Json
-	txID = fmt.Sprintf("%v", mappedData["tx_id"])
 	exitOnError(fileErr, "Could not marshal Json from input file")
+
+	txID = fmt.Sprintf("%v", mappedData["tx_id"])
+	if txID == "<nil>"{
+		exitOnError(errors.New("No 'tx_id' field in input Json"), "Processing halted")
+	}
 
 	jwe, tokenError := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
 	message = []byte(jwe)
 	if tokenError != nil {
-		exitOnError(errors.New(""), fmt.Sprintf("%s %s", (*tokenError).From, (*tokenError).Desc))
+		exitOnError(errors.New("Processing halted"), fmt.Sprintf("%s %s", (*tokenError).From, (*tokenError).Desc))
 	}
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
