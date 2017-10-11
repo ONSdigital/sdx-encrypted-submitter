@@ -20,16 +20,15 @@ go install
 This requires that new keys are generated and added to sdx-decrypt so that this utility does not 
 need knowledge of existing eq and sdx keys. To do this we need to generate 2 pairs of keys, one pair that 
 is supplemental to existing eq keys and the other which is supplemental to sdx keys.
-To generate the key pairs we need to create keys with the correct name format .
+To generate the key pairs we need to create keys with the correct name format.
 ```
 sdc-<service>-submission-<key-use>-<key-type>-<version>.pem
 ```
-Where 
-<service> is set to 'submitter' for upstream keys and 'sdx' for sdx keys
-Note 'submitter' is used in place of 'eq' so that we do not clash with eq keys.
-<key-use> is set to 'signing' for upstream keys and 'encryption' for sdx keys
-<key-type> is set to public or private
-<version> is set to a version number. Note to avoid collisions with sdx keys the sdx version number starts at 1000
+Where <service> is set to 'submitter' for upstream keys and 'sdx' for sdx keys.
+*Note 'submitter' is used in place of 'eq' so that we do not clash with eq keys.*
+<key-use> is set to 'signing' for upstream keys and 'encryption' for sdx keys.
+<key-type> is set to public or private.
+<version> is set to a version number. Note to avoid collisions with sdx keys the sdx version number starts at 1000.
 
 ```
 openssl genrsa out <private_key_name>.pem 4096 
