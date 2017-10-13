@@ -65,18 +65,18 @@ func loadSigningKey(signingKeyPath string) (*PrivateKeyResult, *KeyLoadError) {
 
 	keyData, err := ioutil.ReadFile(signingKeyPath)
 	if err != nil {
-		return nil, &KeyLoadError{Op: "read", Err: "Failed to read signing key from file: " + signingKeyPath}
+		return nil, &KeyLoadError{Operation: "read", Err: "Failed to read signing key from file: " + signingKeyPath}
 	}
 
 	block, _ := pem.Decode(keyData)
 	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, &KeyLoadError{Op: "parse", Err: "Failed to parse signing key from PEM"}
+		return nil, &KeyLoadError{Operation: "parse", Err: "Failed to parse signing key from PEM"}
 	}
 
 	PublicKey, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		return nil, &KeyLoadError{Op: "marshal", Err: "Failed to marshal public key"}
+		return nil, &KeyLoadError{Operation: "marshal", Err: "Failed to marshal public key"}
 	}
 
 	pubBytes := pem.EncodeToMemory(&pem.Block{
@@ -93,20 +93,20 @@ func loadEncryptionKey(encryptionKeyPath string) (*PublicKeyResult, *KeyLoadErro
 
 	keyData, err := ioutil.ReadFile(encryptionKeyPath)
 	if err != nil {
-		return nil, &KeyLoadError{Op: "read", Err: "Failed to read encryption key from file: " + encryptionKeyPath}
+		return nil, &KeyLoadError{Operation: "read", Err: "Failed to read encryption key from file: " + encryptionKeyPath}
 	}
 
 	block, _ := pem.Decode(keyData)
 	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return nil, &KeyLoadError{Op: "parse", Err: "Failed to parse encryption key PEM"}
+		return nil, &KeyLoadError{Operation: "parse", Err: "Failed to parse encryption key PEM"}
 	}
 
 	kid := fmt.Sprintf("%x", sha1.Sum(keyData))
 
 	publicKey, ok := pub.(*rsa.PublicKey)
 	if !ok {
-		return nil, &KeyLoadError{Op: "cast", Err: "Failed to cast key to rsa.PublicKey"}
+		return nil, &KeyLoadError{Operation: "cast", Err: "Failed to cast key to rsa.PublicKey"}
 	}
 
 	return &PublicKeyResult{publicKey, kid}, nil
@@ -123,9 +123,9 @@ type TokenError struct {
 
 // KeyLoadError describes an error that can occur during key loading
 type KeyLoadError struct {
-	// Op is the operation which caused the error, such as
+	// Operation is the operation which caused the error, such as
 	// "read", "parse" or "cast".
-	Op string
+	Operation string
 
 	// Err is a description of the error that occurred during the operation.
 	Err string
@@ -135,7 +135,7 @@ func (e *KeyLoadError) Error() string {
 	if e == nil {
 		return "<nil>"
 	}
-	return e.Op + ": " + e.Err
+	return e.Operation + ": " + e.Err
 }
 
 func (e *TokenError) Error() string {

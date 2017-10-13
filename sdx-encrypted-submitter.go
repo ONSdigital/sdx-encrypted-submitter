@@ -122,7 +122,7 @@ func getRawMessage(filePath string) ([]byte, error) {
 	return msgBody, nil
 }
 
-func sendToRabbit(url string, exchange string, routingKey string, txID string, msgBody []byte) error {
+func sendToRabbit(url , exchange , routingKey, txID string, msgBody []byte) error {
 
 	var conn *amqp.Connection
 	var ch *amqp.Channel
@@ -140,7 +140,6 @@ func sendToRabbit(url string, exchange string, routingKey string, txID string, m
 		return err
 	}
 
-	var headers = amqp.Table{"tx_id": txID}
 	err = ch.Publish(
 		exchange,   // exchange
 		routingKey, // routing key
@@ -149,7 +148,7 @@ func sendToRabbit(url string, exchange string, routingKey string, txID string, m
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        msgBody,
-			Headers:     headers,
+			Headers:     amqp.Table{"tx_id": txID},
 		})
 
 	return err
