@@ -138,13 +138,13 @@ func (e *KeyLoadError) Error() string {
 	return e.Operation + ": " + e.Err
 }
 
-func (e *TokenError) Error() string {
-	if e == nil {
+func (tokenErr *TokenError) Error() string {
+	if tokenErr == nil {
 		return "<nil>"
 	}
-	err := e.Desc
-	if e.From != nil {
-		err += " (" + e.From.Error() + ")"
+	err := tokenErr.Desc
+	if tokenErr.From != nil {
+		err += " (" + tokenErr.From.Error() + ")"
 	}
 	return err
 }
