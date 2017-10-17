@@ -10,20 +10,21 @@ import (
 
 func TestNotSupplyingAnyArgument(t *testing.T) {
 
-	cmd := exec.Command("sdx-encrypted-submitter", "-e","something.txt", "-s", "somethingelse.txt")
+	cmd := exec.Command("go", "run", "sdx-encrypted-submitter.go", "-e", "something.txt", "-s", "somethingelse.txt")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
 	}
 	var expected = "could not read message body  -  no file name supplied\n"
 	var actual = string(output)
-	if actual != expected {
-		t.Error("expected ", expected, "got ", actual)
+	if !strings.Contains(actual, expected) { // Command line output includes status IDE does not
+		t.Error("expected:", expected, "actual: ", actual)
 	}
 }
 
 func TestSupplyingUnknownArgument(t *testing.T) {
-	cmd := exec.Command("sdx-encrypted-submitter", "-Y")
+
+	cmd := exec.Command("go", "run", "sdx-encrypted-submitter.go", "-Y")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
@@ -37,7 +38,8 @@ func TestSupplyingUnknownArgument(t *testing.T) {
 }
 
 func TestUnableToReadSourceFile(t *testing.T) {
-	cmd := exec.Command("sdx-encrypted-submitter", "-f", "AFileThatClearlyDoesNotExist","-e","something.txt", "-s", "somethingelse.txt")
+
+	cmd := exec.Command("go", "run", "sdx-encrypted-submitter.go", "-f", "AFileThatClearlyDoesNotExist", "-e", "something.txt", "-s", "somethingelse.txt")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Error("No error when one was expected")
