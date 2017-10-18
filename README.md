@@ -7,7 +7,7 @@ Building and Running
 Install Go and ensure that your GOPATH env is set ( usually it's ~/go).
 
 ```
-go get  github.com/ONSdigital/sdx-encrypted_submitter/
+go get  github.com/ONSdigital/sdx-encrypted-submitter/
 cd $GOPATH/src/sdx-encrypted-submitter
 go get -u github.com/streadway/amqp
 go get -u gopkg.in/yaml.v2
