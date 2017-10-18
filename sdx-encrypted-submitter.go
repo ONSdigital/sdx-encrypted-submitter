@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sdx-encrypted-submitter/authentication"
+	"github.com/ONSdigital/sdx-encrypted-submitter/authentication"
 )
 
 // Config part read from command line and part from sdx-encrypted-submitter.yml
