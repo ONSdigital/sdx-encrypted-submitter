@@ -85,10 +85,10 @@ func main() {
 		exitOnError(errors.New("No 'tx_id' field in input Json"), "Processing halted")
 	}
 
-	jwe, tokenError := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
+	jwe, err := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
 	message = []byte(jwe)
-	if tokenError != nil {
-		exitOnError(errors.New("Processing halted"), fmt.Sprintf("%s %s", (*tokenError).From, (*tokenError).Desc))
+	if err != nil {
+		exitOnError(errors.New("Processing halted"), fmt.Sprintf("%s %s", (*err).From, (*err).Desc))
 	}
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
