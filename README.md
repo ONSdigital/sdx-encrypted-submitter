@@ -11,6 +11,7 @@ go get  github.com/ONSdigital/sdx-encrypted-submitter/
 cd $GOPATH/src/github.com/ONSdigital/sdx-encrypted-submitter
 go get -u github.com/streadway/amqp
 go get -u gopkg.in/yaml.v2
+go get -u gopkg.in/square/go-jose.v2
 go build
 go install
 ```
