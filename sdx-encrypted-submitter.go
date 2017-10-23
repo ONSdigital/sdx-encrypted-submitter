@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,10 +10,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"github.com/ONSdigital/sdx-encrypted-submitter/authentication"
 )
 
-// Config part read from command line and part from sdx-submitter.yml
-
+// Config part read from command line and part from sdx-encrypted-submitter.yml
 type config struct {
 	Name              string
 	Password          string
@@ -26,27 +27,43 @@ type config struct {
 	MessageFilePath   string
 }
 
-const configFileName = "./sdx-submitter.yml"
+const configFileName = "./sdx-encrypted-submitter.yml"
+
+var testArgs []string // testArgs not exported , used for testing only
 
 func main() {
 
-	// Read a source file and place it on a rabbit topic exchange
+	// Read a source file of raw Json wrap it in a JWE/JWT and place it on a rabbit topic exchange
 	// Exchange , Queue and binding must be in place before use
 
 	var config config
+	var txID string
+
+	//  Use testArgs if supplied ahead of command line
+	a := os.Args[1:]
+	if testArgs != nil {
+		a = testArgs
+	}
 
 	// access command line parameters
 
 	flag.StringVar(&config.Name, "n", "", "name of the rabbit user")
 	flag.StringVar(&config.Password, "p", "", "password of the rabbit user")
-	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a private key file used for encryption")
+	flag.StringVar(&config.EncryptionKeyFile, "e", "", "path to a public key file used for encryption")
 	flag.StringVar(&config.SigningKeyFile, "s", "", "path to a private key used for signing")
 	flag.StringVar(&config.MessageFilePath, "f", "", "path to filename to send")
 
-	flag.Parse()
+	flag.CommandLine.Parse(a)
+
+	if config.EncryptionKeyFile == "" {
+		exitOnError(errors.New("encryption key file not supplied"), "encryption key required")
+	}
+
+	if config.SigningKeyFile == "" {
+		exitOnError(errors.New("signing key file not supplied"), "signing key required")
+	}
 
 	// Get config file values
-
 	configFile, filepathError := filepath.Abs(configFileName)
 	exitOnError(filepathError, fmt.Sprintf(" cannot get absolute filename from %s", configFileName))
 
@@ -56,14 +73,26 @@ func main() {
 	marshalError := yaml.Unmarshal(yamlFile, &config)
 	exitOnError(marshalError, fmt.Sprintf("unable to unMarshal yaml from %s", configFileName))
 
-	message, messageError := getMessage(config.MessageFilePath)
+	message, messageError := getRawMessage(config.MessageFilePath)
 	exitOnError(messageError, "could not read message body")
 
-	// If encrypt specified then encrypt
-	// if sign specified then sign
+	var mappedData map[string]interface{}
+	fileErr := json.Unmarshal(message, &mappedData) //file contents are arbitrary Json
+	exitOnError(fileErr, "Could not marshal Json from input file")
+
+	txID = fmt.Sprintf("%v", mappedData["tx_id"])
+	if txID == "<nil>"{
+		exitOnError(errors.New("No 'tx_id' field in input Json"), "Processing halted")
+	}
+
+	jwe, err := authentication.GetJwe(mappedData, config.SigningKeyFile, config.EncryptionKeyFile)
+	message = []byte(jwe)
+	if err != nil {
+		exitOnError(errors.New("Processing halted"), fmt.Sprintf("%s %s", (*err).From, (*err).Desc))
+	}
 
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/%s", config.Name, config.Password, config.Host, config.Port, config.Vhost)
-	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, message)
+	rabbitError := sendToRabbit(url, config.Exchange, config.RoutingKey, txID, message)
 	exitOnError(rabbitError, "unable to send message to rabbitmq")
 
 	fmt.Printf("message from file:'%s' published to exchange:'%s' using routing key:'%s\n", config.MessageFilePath, config.Exchange, config.RoutingKey)
@@ -71,13 +100,13 @@ func main() {
 
 func exitOnError(err error, msg string) {
 	if err != nil {
-		fmt.Println("%s: %s", msg, err)
+		fmt.Println(msg, " - ", err)
 		os.Exit(1)
 	}
 }
 
-// Consider adding stdin reading here to support piping ?
-func getMessage(filePath string) ([]byte, error) {
+//TODO Consider adding stdin reading here to support piping ?
+func getRawMessage(filePath string) ([]byte, error) {
 	var msgBody []byte
 	var err error
 
@@ -93,7 +122,7 @@ func getMessage(filePath string) ([]byte, error) {
 	return msgBody, nil
 }
 
-func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte) error {
+func sendToRabbit(url , exchange , routingKey, txID string, msgBody []byte) error {
 
 	var conn *amqp.Connection
 	var ch *amqp.Channel
@@ -119,6 +148,7 @@ func sendToRabbit(url string, exchange string, routingKey string, msgBody []byte
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        msgBody,
+			Headers:     amqp.Table{"tx_id": txID},
 		})
 
 	return err
